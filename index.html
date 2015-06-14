@@ -1,0 +1,102 @@
+<html>
+  <head>
+    <title>My first Three.js app</title>
+    <style>
+      body { margin: 0; }
+      canvas { width: 100%; height: 100% }
+    </style>
+  </head>
+  <body>
+    <script src="lib/three.js"></script>
+    <script id="vertexshader" type="x-shader/x-vertex">
+    attribute float displacement;
+    varying vec3 vNormal;
+    /**
+     * Multiply each vertex by the model-view matrix
+     * and the projection matrix (both provided by
+     * Three.js) to get a final vertex position
+     */
+    void main() {
+        // Where does normal come from!?
+        vNormal = normal;
+
+        vec3 newPosition = position + normal * vec3(displacement);
+
+        gl_Position = projectionMatrix *
+                      modelViewMatrix *
+                      vec4(newPosition, 1.0);
+    }
+    </script>
+    <script id="fragmentshader" type="x-shader/x-fragment">
+    varying vec3 vNormal;
+    /**
+     * Set the colour to a lovely pink.
+     * Note that the color is a 4D Float
+     * Vector, R,G,B and A and each part
+     * runs from 0.0 to 1.0
+     */
+    void main() {
+        vec3 light = vec3(0.5, 0.2, 1.0);
+        light = normalize(light);
+        float dProd = max(0.0, dot(vNormal, light));
+
+        // gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+        gl_FragColor = vec4(dProd, dProd, dProd, 1.0);
+    }
+    </script>
+    <script>
+      var scene = new THREE.Scene();
+      var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+
+      var renderer = new THREE.WebGLRenderer();
+      renderer.setSize( window.innerWidth, window.innerHeight );
+      document.body.appendChild( renderer.domElement );
+
+      var attributes = {
+        displacement: {
+          type: 'f',
+          value: [],
+        }
+      };
+
+      // var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+      // var geometry = new THREE.BoxGeometry( 1, 1, 1 );
+      var geometry = new THREE.SphereGeometry( 5, 32, 32 );
+      // var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+      var shaderMaterial = new THREE.ShaderMaterial({
+        attributes: attributes,
+          vertexShader:   document.querySelector('#vertexshader').textContent,
+          fragmentShader: document.querySelector('#fragmentshader').textContent
+      });
+
+      var cube = new THREE.Mesh( geometry, shaderMaterial );
+      scene.add( cube );
+
+
+      camera.position.z = 10;
+
+      function render() {
+        spikey();
+        var nowMs = Date.now() * 0.002;
+        camera.position.x = Math.sin(nowMs) * 30;
+        camera.position.z = Math.cos(nowMs) * 30;
+        camera.lookAt(scene.position);
+        // cube.rotation.x += 0.1;
+        // cube.rotation.y += 0.1;
+        requestAnimationFrame( render );
+        renderer.render( scene, camera );
+      }
+      render();
+
+      function spikey() {
+        var vertices = geometry.vertices;
+        var values = attributes.displacement.value;
+        for (var v = 0; v < vertices.length; v++) {
+          values[v] = Math.random()*5;
+        }
+        // shaderMaterial.attributes.displacement.needsUpdate = true;
+      }
+
+    </script>
+  </body>
+</html>

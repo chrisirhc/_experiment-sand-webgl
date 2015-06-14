@@ -1,0 +1,116 @@
+<html>
+  <head>
+    <title>Drawing</title>
+    <style>
+      body { margin: 0; }
+      canvas { width: 100%; height: 100% }
+    </style>
+  </head>
+  <body>
+    <script src="lib/three.js"></script>
+    <script id="vertexshader" type="x-shader/x-vertex">
+    varying vec3 vPosition;
+    /**
+     * Multiply each vertex by the model-view matrix
+     * and the projection matrix (both provided by
+     * Three.js) to get a final vertex position
+     */
+    void main() {
+        // Where does normal come from!?
+        vPosition = position;
+
+        // vec3 newPosition = position + normal * vec3(displacement);
+
+        gl_Position = projectionMatrix *
+                      modelViewMatrix *
+                      vec4(position, 1.0);
+    }
+    </script>
+    <script id="fragmentshader" type="x-shader/x-fragment">
+    uniform vec2 dimensions;
+    uniform vec2 cursorPoint;
+    varying vec3 vPosition;
+    /**
+     * Set the colour to a lovely pink.
+     * Note that the color is a 4D Float
+     * Vector, R,G,B and A and each part
+     * runs from 0.0 to 1.0
+     */
+    void main() {
+        // vec3 light = vec3(0.5, 0.2, 1.0);
+        // light = normalize(light);
+        // float dProd = max(0.0, dot(vNormal, light));
+
+        // gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);
+        gl_FragColor = vec4(
+          (vPosition[0] - cursorPoint[0]) / dimensions[0],
+          (vPosition[1] - cursorPoint[1]) / dimensions[1],
+          1.0, 1.0);
+        // gl_FragColor = vec4(dProd, dProd, dProd, 1.0);
+    }
+    </script>
+    <script>
+      var scene = new THREE.Scene();
+      var width = window.innerWidth;
+      var height = window.innerHeight;
+      // var camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
+      var camera = new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, -10, 1000 );
+
+      var renderer = new THREE.WebGLRenderer();
+      renderer.setSize( window.innerWidth, window.innerHeight );
+      document.body.appendChild( renderer.domElement );
+
+      var attributes = {
+        displacement: {
+          type: 'f',
+          value: [],
+        }
+      };
+
+      var geometry = new THREE.PlaneGeometry( width, height, 32, 32 );
+      var cursor = new THREE.SphereGeometry( 10 );
+      var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+      var uniforms = {
+        cursorPoint: {
+          type: 'v2',
+          value: new THREE.Vector2(),
+        },
+        dimensions: {
+          type: 'v2',
+          value: new THREE.Vector2(width / 2, height / 2),
+        }
+      };
+      var shaderMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        attributes: attributes,
+          vertexShader:   document.querySelector('#vertexshader').textContent,
+          fragmentShader: document.querySelector('#fragmentshader').textContent
+      });
+      var material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+
+      var plane = new THREE.Mesh( geometry, shaderMaterial );
+      var cursorMesh = new THREE.Mesh( cursor, material );
+      scene.add( plane );
+      scene.add( cursorMesh );
+
+      function render() {
+        var nowMs = Date.now() * 0.002;
+        // camera.position.x = Math.sin(nowMs) * 30;
+        // camera.position.z = Math.cos(nowMs) * 30;
+        // camera.lookAt(scene.position);
+        // cube.rotation.x += 0.1;
+        // cube.rotation.y += 0.1;
+        requestAnimationFrame( render );
+        renderer.render( scene, camera );
+      }
+      render();
+
+      document.body.addEventListener('mousemove', function (e) {
+        // uniforms.cursorPoint.value.set(e.clientX, e.clientY);
+        cursorMesh.position.x = e.clientX - width / 2;
+        cursorMesh.position.y = height / 2 - e.clientY;
+      });
+
+    </script>
+  </body>
+</html>

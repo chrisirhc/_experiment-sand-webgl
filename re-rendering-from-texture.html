@@ -1,0 +1,153 @@
+<html>
+  <head>
+    <title>Drawing</title>
+    <style>
+      body { margin: 0; background: #ccc; }
+      canvas { width: 100%; height: 100% }
+    </style>
+  </head>
+  <body>
+    <script src="lib/three.js"></script>
+    <script id="vertexshader" type="x-shader/x-vertex">
+    varying vec3 vPosition;
+    /**
+     * Multiply each vertex by the model-view matrix
+     * and the projection matrix (both provided by
+     * Three.js) to get a final vertex position
+     */
+    void main() {
+        // Where does normal come from!?
+        vec4 x = projectionMatrix *
+                      modelViewMatrix *
+                      vec4(position, 1.0);
+        // TODO: Do these transformations elsewhere later
+        vPosition = vec3(0.5 + x.x / 2.0, 0.5 + x.y / 2.0, 0);
+
+        // vec3 newPosition = position + normal * vec3(displacement);
+
+        gl_Position = projectionMatrix *
+                      modelViewMatrix *
+                      vec4(position, 1.0);
+    }
+    </script>
+    <script id="fragmentshader" type="x-shader/x-fragment">
+    uniform sampler2D tex;
+    varying vec3 vPosition;
+    /**
+     * Set the colour to a lovely pink.
+     * Note that the color is a 4D Float
+     * Vector, R,G,B and A and each part
+     * runs from 0.0 to 1.0
+     */
+    void main() {
+      gl_FragColor = texture2D(tex, vec2(vPosition.s, vPosition.t));
+    }
+    </script>
+    <script>
+      var width = 1024;
+      var height = 768;
+      var camera = new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, -10, 1000 );
+
+      var renderers = [makeRenderer(), makeRenderer()];
+      var textures = [
+        new THREE.Texture(renderers[0].domElement),
+        new THREE.Texture(renderers[1].domElement),
+      ];
+      var scenes = [
+        makeScene(textures[1]),
+        makeScene(textures[0]),
+      ];
+
+      makeCanvasTexture(renderers[1], function () {
+        textures[1].needsUpdate = true;
+        renderers.forEach(function (r) {
+          document.body.appendChild( r.domElement );
+          r.domElement.style.position = 'absolute';
+        });
+        render();
+      });
+
+      var nextRenderIdx = 0;
+      function render() {
+        // requestAnimationFrame( render );
+
+        // TODO Orchestrate the different renderers
+        renderers[nextRenderIdx].render( scenes[nextRenderIdx], camera );
+
+        // Show only next renderer
+        renderers.forEach(function (r) {
+          r.domElement.style.opacity = 0;
+        });
+        renderers[nextRenderIdx].domElement.style.opacity = 1;
+        textures[1- nextRenderIdx].needsUpdate = true;
+
+        // Swap renderers
+        nextRenderIdx = (nextRenderIdx + 1) % renderers.length;
+      }
+
+      function makeRenderer() {
+        var renderer = new THREE.WebGLRenderer({
+          preserveDrawingBuffer: true,
+        });
+        renderer.setSize( width, height );
+        return renderer;
+      }
+
+      function makeScene(renderFromTexture) {
+        var scene = new THREE.Scene();
+
+        var geometry = new THREE.PlaneGeometry( width, height );
+
+        var uniforms = {
+          tex: {
+            type: 't',
+            value: renderFromTexture,
+          },
+        };
+
+        var shaderMaterial = new THREE.ShaderMaterial({
+            uniforms: uniforms,
+            vertexShader:   document.querySelector('#vertexshader').textContent,
+            fragmentShader: document.querySelector('#fragmentshader').textContent
+        });
+        var plane = new THREE.Mesh( geometry, shaderMaterial );
+        scene.add( plane );
+
+        return scene;
+      }
+
+      function makeCanvasTexture(renderer, done) {
+        var canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        var context = canvas.getContext('2d');
+        var texture = new THREE.Texture(canvas);
+
+        var img = new Image();
+        img.src = 'start-map.png';
+        img.onload = function () {
+          context.drawImage(img, 0, 0);
+          if (texture) {
+            texture.needsUpdate = true;
+          }
+
+          renderer.render(scene, camera);
+          done();
+        };
+
+        var material = new THREE.MeshBasicMaterial({
+          map: texture,
+        });
+        material.transparent = true;
+
+        var mesh =  new THREE.Mesh(
+          new THREE.PlaneGeometry(width, height),
+          material);
+
+        var scene = new THREE.Scene();
+        scene.add( mesh );
+      }
+
+    </script>
+  </body>
+</html>
