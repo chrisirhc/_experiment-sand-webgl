@@ -26,6 +26,37 @@
     <script id="fragmentshader" type="x-shader/x-fragment">
     uniform sampler2D tex;
     varying vec2 vUv;
+
+    void main() {
+      gl_FragColor = texture2D(tex, vec2(vUv.s, vUv.t)) + vec4(0.01);
+    }
+    </script>
+    <script id="initshader" type="x-shader/x-fragment">
+    uniform vec2 dimensions;
+    uniform sampler2D tex;
+    varying vec2 vUv;
+
+    const float threshold = 0.8; // 50 / 255
+    const float alpha = 0.1; // < 1 / 8
+
+    void accumdiff(in vec2 coord, inout vec4 accum) {
+      coord /= dimensions;
+      vec2 target = texture2D(tex, vUv + coord).rb;
+      /** If it isn't an area that was just cleared **/
+      // if(target[0] == target[1]) {
+      // }
+
+      float temp = texture2D(tex, vUv).r - target[0];
+      /**
+        g contains the degree here
+        b contains the amount of sand
+       **/
+      if (temp > threshold) {
+        accum.b = temp * alpha + accum.b;
+        accum.g += 1.0;
+      }
+    }
+
     /**
      * Set the colour to a lovely pink.
      * Note that the color is a 4D Float
@@ -33,7 +64,73 @@
      * runs from 0.0 to 1.0
      */
     void main() {
-      gl_FragColor = texture2D(tex, vec2(vUv.s, vUv.t)) + vec4(0.01);
+      vec4 accum = vec4(0.0, 0.0, 0.0, 1.0);
+
+      accumdiff(vec2(-1.0, -1.0), accum);
+      accumdiff(vec2(-1.0,  0.0), accum);
+      accumdiff(vec2(-1.0,  1.0), accum);
+
+      accumdiff(vec2( 0.0, -1.0), accum);
+      accumdiff(vec2( 0.0,  1.0), accum);
+
+      accumdiff(vec2( 1.0, -1.0), accum);
+      accumdiff(vec2( 1.0,  0.0), accum);
+      accumdiff(vec2( 1.0,  1.0), accum);
+
+      /** g becomes the amount to distribute per surrounding pixel **/
+      if (accum.g > 0.0) {
+        accum.g = accum.b / accum.g;
+      }
+      // TODO: comment out later, this is for debugging
+      accum.rgb = accum.bgb;
+
+      gl_FragColor = accum;
+    }
+    </script>
+    <script id="pushshader" type="x-shader/x-fragment">
+    uniform vec2 dimensions;
+    uniform sampler2D tex;
+    uniform sampler2D tex2;
+    varying vec2 vUv;
+
+    const float threshold = 0.8; // 50 / 255
+
+    void collectfrom(in vec2 coord, inout vec4 accum) {
+      coord /= dimensions;
+
+      /** TODO might want to use a bitmask on R component of degmap
+      instead of checking again. **/
+      float temp = texture2D(tex2, vUv + coord).r -
+        texture2D(tex2, vUv).r;
+      /**
+        g contains the amount of sand to be destributed
+        b contains the amount of sand
+       **/
+      if (temp > threshold) {
+        accum.r += texture2D(tex, vUv + coord).g;
+      }
+    }
+
+    void main() {
+      vec4 accum = texture2D(tex2, vUv);
+
+      // /** collect sand from surroundings **/
+      collectfrom(vec2(-1.0, -1.0), accum);
+      collectfrom(vec2(-1.0,  0.0), accum);
+      collectfrom(vec2(-1.0,  1.0), accum);
+
+      collectfrom(vec2( 0.0, -1.0), accum);
+      collectfrom(vec2( 0.0,  1.0), accum);
+
+      collectfrom(vec2( 1.0, -1.0), accum);
+      collectfrom(vec2( 1.0,  0.0), accum);
+      collectfrom(vec2( 1.0,  1.0), accum);
+
+      // * deduct the amount of sand that this distributes out *
+      accum.r -= texture2D(tex, vUv).b;
+      accum.a = 1.0;
+
+      gl_FragColor = accum.rrra;
     }
     </script>
     <script>
@@ -43,14 +140,35 @@
 
       var renderer = makeRenderer();
       var rtRenderers = [
-        new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat }),
-        new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter, format: THREE.RGBFormat }),
+        new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter,
+          type: THREE.FloatType
+        }),
+        new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter,
+          type: THREE.FloatType
+        }),
       ];
+
+      var initRenderer =
+        new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter,
+          type: THREE.FloatType
+        });
 
       var scenes = [
         makeScene(rtRenderers[1]),
         makeScene(rtRenderers[0]),
       ];
+
+      var initScenes = [
+        makeScene(rtRenderers[1], 'initshader'),
+        makeScene(rtRenderers[0], 'initshader'),
+      ];
+
+      var pushScenes = [
+        makeScene(rtRenderers[1], 'pushshader', initRenderer),
+        makeScene(rtRenderers[0], 'pushshader', initRenderer),
+      ];
+
+      var initSceneR = makeScene(initRenderer);
 
       makeCanvasTexture(renderer, rtRenderers[1], function () {
         document.body.appendChild( renderer.domElement );
@@ -59,13 +177,21 @@
 
       var nextRenderIdx = 0;
       function render() {
-        requestAnimationFrame( render );
+        // requestAnimationFrame( render );
 
         // Render to texture first
-        renderer.render( scenes[nextRenderIdx], camera, rtRenderers[nextRenderIdx], true );
+        renderer.render( initScenes[nextRenderIdx], camera, initRenderer, true );
+
+        nextRenderIdx = (nextRenderIdx + 1) % rtRenderers.length;
+
+        // // Render to texture first
+        renderer.render( pushScenes[nextRenderIdx], camera, rtRenderers[nextRenderIdx], true );
+
+        nextRenderIdx = (nextRenderIdx + 1) % rtRenderers.length;
 
         // Render texture
-        renderer.render( scenes[1 - nextRenderIdx], camera);
+        // renderer.render( initSceneR, camera);
+        renderer.render( scenes[nextRenderIdx], camera);
 
         // Swap render target (text)
         nextRenderIdx = (nextRenderIdx + 1) % rtRenderers.length;
@@ -77,7 +203,7 @@
         return renderer;
       }
 
-      function makeScene(renderFromTexture) {
+      function makeScene(renderFromTexture, shaderId, tex2) {
         var scene = new THREE.Scene();
 
         var geometry = new THREE.BoxGeometry( width, height, 1 );
@@ -87,12 +213,23 @@
             type: 't',
             value: renderFromTexture,
           },
+          dimensions: {
+            type: 'v2',
+            value: new THREE.Vector2(width, height),
+          }
         };
+
+        if (tex2) {
+          uniforms.tex2 = {
+            type: 't',
+            value: tex2,
+          };
+        }
 
         var shaderMaterial = new THREE.ShaderMaterial({
             uniforms: uniforms,
             vertexShader:   document.querySelector('#vertexshader').textContent,
-            fragmentShader: document.querySelector('#fragmentshader').textContent
+            fragmentShader: document.querySelector('#' + (shaderId || 'fragmentshader')).textContent
         });
         var plane = new THREE.Mesh( geometry, shaderMaterial );
         scene.add( plane );
@@ -108,7 +245,7 @@
         var texture = new THREE.Texture(canvas);
 
         var img = new Image();
-        img.src = 'start-map.png';
+        img.src = 'start-map-3.png';
         img.onload = function () {
           context.drawImage(img, 0, 0);
           if (texture) {
