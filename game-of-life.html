@@ -147,11 +147,17 @@
       var mouseDownCoords = null;
       makeCanvasTexture(renderer, rtRenderers[1], function () {
         document.body.appendChild( renderer.domElement );
+        var isMouseDown = false;
         renderer.domElement.addEventListener('mousedown', function (e) {
-          mouseDownCoords = [e.pageX, e.pageY];
-          console.log(mouseDownCoords);
+          isMouseDown = true;
+        });
+        renderer.domElement.addEventListener('mousemove', function (e) {
+          if (isMouseDown) {
+            mouseDownCoords = [e.pageX, e.pageY];
+          }
         });
         renderer.domElement.addEventListener('mouseup', function (e) {
+          isMouseDown = false;
           mouseDownCoords = null;
         });
         render();
@@ -233,10 +239,11 @@
         scene.add(innerCursorMesh);
 
         scene.setPosition = function (x, y) {
-          outerCursorMesh.position.setX(x);
-          outerCursorMesh.position.setY(y);
-          innerCursorMesh.position.setX(x);
-          innerCursorMesh.position.setY(y);
+          // TODO: Do proper transforms
+          outerCursorMesh.position.setX(x - width / 2);
+          outerCursorMesh.position.setY(height / 2 - y);
+          innerCursorMesh.position.setX(x - width / 2);
+          innerCursorMesh.position.setY(height / 2 - y);
         };
 
         return scene;
