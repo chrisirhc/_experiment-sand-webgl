@@ -182,6 +182,19 @@
           isMouseDown = false;
           mouseDownCoords = null;
         });
+
+        renderer.domElement.addEventListener('touchstart', function (e) {
+          isMouseDown = true;
+        });
+        renderer.domElement.addEventListener('touchmove', function (e) {
+          if (isMouseDown) {
+            mouseDownCoords = [e.touches[0].pageX, e.touches[0].pageY];
+          }
+        });
+        renderer.domElement.addEventListener('touchend', function (e) {
+          isMouseDown = false;
+          mouseDownCoords = null;
+        });
         render();
       });
 
