@@ -131,8 +131,8 @@
     }
     </script>
     <script>
-      var width = 1024;
-      var height = 768;
+      var width = window.innerWidth;
+      var height = window.innerHeight;
       var camera = new THREE.OrthographicCamera( width / - 2, width / 2, height / 2, height / - 2, -10, 1000 );
 
       var renderer = makeRenderer();
