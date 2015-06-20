@@ -10,6 +10,7 @@
     <script src="lib/three.js"></script>
     <script id="vertexshader" type="x-shader/x-vertex">
     varying vec2 vUv;
+    varying vec2 vUvScreen;
     /**
      * Multiply each vertex by the model-view matrix
      * and the projection matrix (both provided by
@@ -21,6 +22,13 @@
         gl_Position = projectionMatrix *
                       modelViewMatrix *
                       vec4(position, 1.0);
+
+        vUvScreen = (
+          projectionMatrix *
+                      modelViewMatrix *
+                      vec4(position, 1.0)).xy * vec2(0.5) + vec2(0.5);
+
+        ;
     }
     </script>
     <script id="fragmentshader" type="x-shader/x-fragment">
@@ -28,7 +36,21 @@
     varying vec2 vUv;
 
     void main() {
-      gl_FragColor = texture2D(tex, vec2(vUv.s, vUv.t));
+      gl_FragColor = texture2D(tex, vUv);
+    }
+    </script>
+    <script id="brushShader" type="x-shader/x-fragment">
+    uniform sampler2D tex;
+    varying vec2 vUvScreen;
+
+    void main() {
+      vec4 prevColor = texture2D(tex, vUvScreen);
+      if (prevColor.g != 1.0) {
+        gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+      }
+      else {
+        gl_FragColor = prevColor;
+      }
     }
     </script>
     <script id="pushshader" type="x-shader/x-fragment">
@@ -225,10 +247,20 @@
         return scene;
       }
 
-      function makeCursorScene() {
+      function makeCursorScene(renderFromTexture) {
+        var uniforms = {
+          tex: {
+            type: 't',
+            value: renderFromTexture,
+          },
+        };
         var scene = new THREE.Scene();
         var outerCursor = new THREE.CircleGeometry( 20 );
-        var outerCursorMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000 } );
+        var outerCursorMaterial = new THREE.ShaderMaterial({
+          uniforms: uniforms,
+          vertexShader:   document.querySelector('#vertexshader').textContent,
+          fragmentShader: document.querySelector('#brushShader').textContent
+        });
         var outerCursorMesh = new THREE.Mesh( outerCursor, outerCursorMaterial );
         outerCursorMesh.position.setZ(10);
 
