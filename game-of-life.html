@@ -137,16 +137,16 @@
       var renderer = makeRenderer();
       var rtRenderers = [
         new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter,
-          type: THREE.FloatType
+          type: THREE.HalfFloatType
         }),
         new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter,
-          type: THREE.FloatType
+          type: THREE.HalfFloatType
         }),
       ];
 
       var initRenderer =
         new THREE.WebGLRenderTarget( width, height, { minFilter: THREE.LinearFilter, magFilter: THREE.NearestFilter,
-          type: THREE.FloatType
+          type: THREE.HalfFloatType
         });
 
       var scenes = [
