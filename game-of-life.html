@@ -227,13 +227,15 @@
 
       function makeCursorScene() {
         var scene = new THREE.Scene();
-        var outerCursor = new THREE.SphereGeometry( 10 );
+        var outerCursor = new THREE.CircleGeometry( 20 );
         var outerCursorMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000 } );
         var outerCursorMesh = new THREE.Mesh( outerCursor, outerCursorMaterial );
+        outerCursorMesh.position.setZ(10);
 
-        var innerCursor = new THREE.SphereGeometry( 2 );
+        var innerCursor = new THREE.CircleGeometry( 1 );
         var innerCursorMaterial = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
         var innerCursorMesh = new THREE.Mesh( innerCursor, innerCursorMaterial );
+        innerCursorMesh.position.setZ(10);
 
         scene.add(outerCursorMesh);
         scene.add(innerCursorMesh);
