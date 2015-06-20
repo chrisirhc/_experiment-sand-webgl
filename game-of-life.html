@@ -181,6 +181,7 @@
       function makeRenderer() {
         var renderer = new THREE.WebGLRenderer();
         renderer.setSize( width, height );
+        renderer.autoClear = false;
         return renderer;
       }
 
