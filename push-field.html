@@ -207,6 +207,9 @@
         renderer.render( pushScenes[nextRenderIdx], camera, rtRenderers[nextRenderIdx], true );
 
         if (mouseDownCoords) {
+          // TODO: // ATTTEMPT TO SOLVE STATIONARY CURSOR PROBLEM
+          // nextRenderIdx = (nextRenderIdx + 1) % rtRenderers.length;
+          // renderer.render( scenes[nextRenderIdx], camera, rtRenderers[nextRenderIdx], true );
           brushScenes[nextRenderIdx].setPosition(mouseDownCoords[0], mouseDownCoords[1]);
           renderer.render( brushScenes[nextRenderIdx], camera, rtRenderers[nextRenderIdx] );
         }
