@@ -289,18 +289,25 @@
     </script>
     <script id="erosion-prep-shader" type="x-shader/x-fragment">
     uniform vec2 dimensions;
+    uniform sampler2D tForce;
     uniform sampler2D tHeight;
     varying vec2 vUv;
 
     const float threshold = 0.8; // 50 / 255
     const float alpha = 0.1; // < 1 / 8
 
+    bool isD(in vec2 coord) {
+      coord /= dimensions;
+      return texture2D(tForce, vUv + coord).rg == vec2(0.0);
+    }
+
     void accumdiff(in vec2 coord, inout vec4 accum) {
       coord /= dimensions;
       vec2 target = texture2D(tHeight, vUv + coord).rb;
       /** If it isn't an area that was just cleared **/
-      // if(target[0] == target[1]) {
-      // }
+      if(!isD(coord)) {
+        return;
+      }
 
       float temp = texture2D(tHeight, vUv).r - target[0];
       /**
@@ -347,9 +354,14 @@
     uniform vec2 dimensions;
     uniform sampler2D tHeight;
     uniform sampler2D tPrep;
+    uniform sampler2D tForce;
     varying vec2 vUv;
 
     const float threshold = 0.8; // 50 / 255
+
+    bool thisIsD() {
+      return texture2D(tForce, vUv).rg == vec2(0.0);
+    }
 
     void collectfrom(in vec2 coord, inout vec4 accum) {
       coord /= dimensions;
@@ -369,6 +381,10 @@
 
     void main() {
       vec4 accum = texture2D(tHeight, vUv);
+      if (!thisIsD()) {
+        gl_FragColor = accum;
+        return;
+      }
 
       /** collect sand from surroundings **/
       collectfrom(vec2(-1.0, -1.0), accum);
@@ -463,18 +479,22 @@
 
       var erosionPrepScenes = [
         makeScene(null, 'erosion-prep-shader', null, {
+          tForce: tForce[0],
           tHeight: tHeight[1],
         }),
         makeScene(null, 'erosion-prep-shader', null, {
+          tForce: tForce[1],
           tHeight: tHeight[0],
         }),
       ];
       var erosionPushScenes = [
         makeScene(null, 'erosion-push-shader', null, {
+          tForce: tForce[0],
           tPrep: initRenderer,
           tHeight: tHeight[1],
         }),
         makeScene(null, 'erosion-push-shader', null, {
+          tForce: tForce[1],
           tPrep: initRenderer,
           tHeight: tHeight[0],
         }),
