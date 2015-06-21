@@ -32,6 +32,14 @@
         ;
     }
     </script>
+    <script id="copy-shader" type="x-shader/x-fragment">
+    uniform sampler2D tex;
+    varying vec2 vUv;
+
+    void main() {
+      gl_FragColor = texture2D(tex, vUv);
+    }
+    </script>
     <script id="fragmentshader" type="x-shader/x-fragment">
     uniform sampler2D tex;
     varying vec2 vUv;
@@ -279,6 +287,108 @@
 
     }
     </script>
+    <script id="erosion-prep-shader" type="x-shader/x-fragment">
+    uniform vec2 dimensions;
+    uniform sampler2D tHeight;
+    varying vec2 vUv;
+
+    const float threshold = 0.8; // 50 / 255
+    const float alpha = 0.1; // < 1 / 8
+
+    void accumdiff(in vec2 coord, inout vec4 accum) {
+      coord /= dimensions;
+      vec2 target = texture2D(tHeight, vUv + coord).rb;
+      /** If it isn't an area that was just cleared **/
+      // if(target[0] == target[1]) {
+      // }
+
+      float temp = texture2D(tHeight, vUv).r - target[0];
+      /**
+        g contains the degree here
+        b contains the amount of sand
+       **/
+      if (temp > threshold) {
+        accum.b = temp * alpha + accum.b;
+        accum.g += 1.0;
+      }
+    }
+
+    /**
+     * Set the colour to a lovely pink.
+     * Note that the color is a 4D Float
+     * Vector, R,G,B and A and each part
+     * runs from 0.0 to 1.0
+     */
+    void main() {
+      vec4 accum = vec4(0.0, 0.0, 0.0, 1.0);
+
+      accumdiff(vec2(-1.0, -1.0), accum);
+      accumdiff(vec2(-1.0,  0.0), accum);
+      accumdiff(vec2(-1.0,  1.0), accum);
+
+      accumdiff(vec2( 0.0, -1.0), accum);
+      accumdiff(vec2( 0.0,  1.0), accum);
+
+      accumdiff(vec2( 1.0, -1.0), accum);
+      accumdiff(vec2( 1.0,  0.0), accum);
+      accumdiff(vec2( 1.0,  1.0), accum);
+
+      /** g becomes the amount to distribute per surrounding pixel **/
+      if (accum.g > 0.0) {
+        accum.g = accum.b / accum.g;
+      }
+      // TODO: comment out later, this is for debugging
+      accum.rgb = accum.bgb;
+
+      gl_FragColor = accum;
+    }
+    </script>
+    <script id="erosion-push-shader" type="x-shader/x-fragment">
+    uniform vec2 dimensions;
+    uniform sampler2D tHeight;
+    uniform sampler2D tPrep;
+    varying vec2 vUv;
+
+    const float threshold = 0.8; // 50 / 255
+
+    void collectfrom(in vec2 coord, inout vec4 accum) {
+      coord /= dimensions;
+
+      /** TODO might want to use a bitmask on R component of degmap
+      instead of checking again. **/
+      float temp = texture2D(tHeight, vUv + coord).r -
+        texture2D(tHeight, vUv).r;
+      /**
+        g contains the amount of sand to be destributed
+        b contains the amount of sand
+       **/
+      if (temp > threshold) {
+        accum.r += texture2D(tPrep, vUv + coord).g;
+      }
+    }
+
+    void main() {
+      vec4 accum = texture2D(tHeight, vUv);
+
+      /** collect sand from surroundings **/
+      collectfrom(vec2(-1.0, -1.0), accum);
+      collectfrom(vec2(-1.0,  0.0), accum);
+      collectfrom(vec2(-1.0,  1.0), accum);
+
+      collectfrom(vec2( 0.0, -1.0), accum);
+      collectfrom(vec2( 0.0,  1.0), accum);
+
+      collectfrom(vec2( 1.0, -1.0), accum);
+      collectfrom(vec2( 1.0,  0.0), accum);
+      collectfrom(vec2( 1.0,  1.0), accum);
+
+      // * deduct the amount of sand that this distributes out *
+      accum.r -= texture2D(tPrep, vUv).b;
+      accum.a = 1.0;
+
+      gl_FragColor = accum.rrra;
+    }
+    </script>
     <script>
       var width = window.innerWidth;
       var height = window.innerHeight;
@@ -313,6 +423,11 @@
         makeScene(tHeight[0]),
       ];
 
+      var copyScenes = [
+        makeScene(tHeight[1], 'copy-shader'),
+        makeScene(tHeight[0], 'copy-shader'),
+      ];
+
       var brushScenes = [
         makeCursorScene(tForce[1]),
         makeCursorScene(tForce[0]),
@@ -327,20 +442,39 @@
       var heightPrepPushScenes = [
         makeScene(null, 'height-prep-push-shader', null, {
           tForce: tForce[0],
-          tHeight: tHeight[1],
+          tHeight: tHeight[0],
         }),
         makeScene(null, 'height-prep-push-shader', null, {
           tForce: tForce[1],
-          tHeight: tHeight[0],
+          tHeight: tHeight[1],
         }),
       ];
 
       var heightPushScenes = [
         makeScene(null, 'height-push-shader', null, {
           tPrep: initRenderer,
-          tHeight: tHeight[1],
+          tHeight: tHeight[0],
         }),
         makeScene(null, 'height-push-shader', null, {
+          tPrep: initRenderer,
+          tHeight: tHeight[1],
+        }),
+      ];
+
+      var erosionPrepScenes = [
+        makeScene(null, 'erosion-prep-shader', null, {
+          tHeight: tHeight[1],
+        }),
+        makeScene(null, 'erosion-prep-shader', null, {
+          tHeight: tHeight[0],
+        }),
+      ];
+      var erosionPushScenes = [
+        makeScene(null, 'erosion-push-shader', null, {
+          tPrep: initRenderer,
+          tHeight: tHeight[1],
+        }),
+        makeScene(null, 'erosion-push-shader', null, {
           tPrep: initRenderer,
           tHeight: tHeight[0],
         }),
@@ -395,8 +529,14 @@
           renderer.render( brushScenes[nextRenderIdx], camera, tForce[nextRenderIdx] );
         }
 
+        renderer.render( erosionPrepScenes[nextRenderIdx], camera, initRenderer, true );
+        renderer.render( erosionPushScenes[nextRenderIdx], camera, tHeight[nextRenderIdx], true );
+
+        // Read from nextRenderIdx
         renderer.render( heightPrepPushScenes[nextRenderIdx], camera, initRenderer, true );
-        renderer.render( heightPushScenes[nextRenderIdx], camera, tHeight[nextRenderIdx], true );
+        // Write to nextRenderIdx
+        renderer.render( heightPushScenes[nextRenderIdx], camera, tHeight[1-nextRenderIdx], true );
+        renderer.render( copyScenes[nextRenderIdx], camera, tHeight[nextRenderIdx], true );
 
         // Swap render target (text)
         nextRenderIdx = (nextRenderIdx + 1) % tHeight.length;
