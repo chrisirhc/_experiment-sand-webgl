@@ -444,9 +444,14 @@
         makeScene(tHeight[0], 'copy-shader'),
       ];
 
+      var copyForceScenes = [
+        makeScene(tForce[1], 'copy-shader'),
+        makeScene(tForce[0], 'copy-shader'),
+      ];
+
       var brushScenes = [
-        makeCursorScene(tForce[1]),
         makeCursorScene(tForce[0]),
+        makeCursorScene(tForce[1]),
       ];
 
       var pushScenes = [
@@ -546,7 +551,9 @@
           // nextRenderIdx = (nextRenderIdx + 1) % rtRenderers.length;
           // renderer.render( scenes[nextRenderIdx], camera, rtRenderers[nextRenderIdx], true );
           brushScenes[nextRenderIdx].setPosition(mouseDownCoords[0], mouseDownCoords[1]);
-          renderer.render( brushScenes[nextRenderIdx], camera, tForce[nextRenderIdx] );
+          renderer.render( copyForceScenes[1-nextRenderIdx], camera, tForce[1-nextRenderIdx], true );
+          renderer.render( brushScenes[nextRenderIdx], camera, tForce[1-nextRenderIdx] );
+          renderer.render( copyForceScenes[nextRenderIdx], camera, tForce[nextRenderIdx], true );
         }
 
         renderer.render( erosionPrepScenes[nextRenderIdx], camera, initRenderer, true );
