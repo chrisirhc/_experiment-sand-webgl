@@ -513,6 +513,7 @@
         var isMouseDown = false;
         renderer.domElement.addEventListener('mousedown', function (e) {
           isMouseDown = true;
+          mouseDownCoords = [e.pageX, e.pageY];
         });
         renderer.domElement.addEventListener('mousemove', function (e) {
           if (isMouseDown) {
@@ -526,6 +527,7 @@
 
         renderer.domElement.addEventListener('touchstart', function (e) {
           isMouseDown = true;
+          mouseDownCoords = [e.touches[0].pageX, e.touches[0].pageY];
         });
         renderer.domElement.addEventListener('touchmove', function (e) {
           if (isMouseDown) {
