@@ -555,6 +555,11 @@
           renderer.render( brushScenes[nextRenderIdx], camera, tForce[1-nextRenderIdx] );
           renderer.render( copyForceScenes[nextRenderIdx], camera, tForce[nextRenderIdx], true );
         }
+        else {
+          brushScenes.forEach(function (s) {
+            s.removePosition();
+          });
+        }
 
         renderer.render( erosionPrepScenes[nextRenderIdx], camera, initRenderer, true );
         renderer.render( erosionPushScenes[nextRenderIdx], camera, tHeight[nextRenderIdx], true );
@@ -622,6 +627,8 @@
       }
 
       function makeCursorScene(renderFromTexture) {
+        var circleRadius = 20;
+        var circleSegments = 20;
         var uniforms = {
           tex: {
             type: 't',
@@ -629,7 +636,7 @@
           },
         };
         var scene = new THREE.Scene();
-        var outerCursor = new THREE.CircleGeometry( 20 );
+        var outerCursor = new THREE.CircleGeometry( circleRadius, circleSegments );
         var outerCursorMaterial = new THREE.ShaderMaterial({
           uniforms: uniforms,
           vertexShader:   document.querySelector('#vertexshader').textContent,
@@ -643,18 +650,107 @@
         var innerCursorMesh = new THREE.Mesh( innerCursor, innerCursorMaterial );
         innerCursorMesh.position.setZ(10);
 
-        scene.add(outerCursorMesh);
-        scene.add(innerCursorMesh);
+        var outerCursor2 = new THREE.CircleGeometry( circleRadius, circleSegments );
+        var outerCursorMaterial2 = new THREE.ShaderMaterial({
+          uniforms: uniforms,
+          vertexShader:   document.querySelector('#vertexshader').textContent,
+          fragmentShader: document.querySelector('#brushShader').textContent
+        });
+        var outerCursorMesh2 = new THREE.Mesh( outerCursor2, outerCursorMaterial );
+        outerCursorMesh2.position.setZ(10);
+
+        var innerCursor2 = new THREE.CircleGeometry( 1 );
+        var innerCursorMaterial2 = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+        var innerCursorMesh2 = new THREE.Mesh( innerCursor2, innerCursorMaterial );
+
+        scene.add(outerCursorMesh2);
+        scene.add(innerCursorMesh2);
+
+        var prevPoint = null;
+        var prevShape = null;
+        var prevShape2 = null;
+
+        scene.removePosition = function () {
+          prevPoint = null;
+        };
 
         scene.setPosition = function (x, y) {
-          // TODO: Do proper transforms
-          outerCursorMesh.position.setX(x - width / 2);
-          outerCursorMesh.position.setY(height / 2 - y);
-          innerCursorMesh.position.setX(x - width / 2);
-          innerCursorMesh.position.setY(height / 2 - y);
+          var newPoint = [x, y];
+
+          if (prevShape) {
+            scene.remove(prevShape);
+            prevShape = null;
+          }
+
+          if (prevShape2) {
+            scene.remove(prevShape2);
+            prevShape2 = null;
+          }
+
+          makeArc(prevPoint, newPoint);
+          prevPoint = newPoint;
         };
 
         return scene;
+
+        function makeArc(from, to) {
+          var toXY = new THREE.Vector2(to[0] - width / 2, height / 2 - to[1]);
+          outerCursorMesh2.position.setX(toXY.x);
+          outerCursorMesh2.position.setY(toXY.y);
+          innerCursorMesh2.position.setX(toXY.x);
+          innerCursorMesh2.position.setY(toXY.y);
+
+          if (!from) {
+            scene.remove(outerCursorMesh);
+            scene.remove(innerCursorMesh);
+            return;
+          }
+          else {
+            scene.add(outerCursorMesh);
+            scene.add(innerCursorMesh);
+          }
+
+          var fromXY = new THREE.Vector2(from[0] - width / 2, height / 2 - from[1]);
+
+          var gradientV = toXY.clone().sub(fromXY).normalize();
+          var crossV = (new THREE.Vector2(-gradientV.y, gradientV.x)).multiplyScalar(circleRadius);
+
+          // Circle at from, circle at to, line in between
+          outerCursorMesh.position.setX(fromXY.x);
+          outerCursorMesh.position.setY(fromXY.y);
+          innerCursorMesh.position.setX(fromXY.x);
+          innerCursorMesh.position.setY(fromXY.y);
+
+          // Draw a box between
+          if (crossV.length()) {
+            var rectShape = new THREE.Shape();
+            var points = [
+              fromXY.clone().sub(crossV), toXY.clone().sub(crossV),
+              toXY.clone().add(crossV), fromXY.clone().add(crossV),
+            ];
+            rectShape.moveTo(points[0].x, points[0].y);
+            rectShape.lineTo(points[1].x, points[1].y);
+            rectShape.lineTo(points[2].x, points[2].y);
+            rectShape.lineTo(points[3].x, points[3].y);
+            rectShape.lineTo(points[0].x, points[0].y); // close path
+
+            var rectShapeGeom = new THREE.ShapeGeometry( rectShape );
+            var rectShapeMesh =
+               new THREE.Mesh( rectShapeGeom, outerCursorMaterial );
+            rectShapeMesh.position.setZ(10);
+            scene.add(rectShapeMesh);
+            prevShape = rectShapeMesh;
+
+            var lineGeom = new THREE.Geometry();
+            lineGeom.vertices.push(
+              new THREE.Vector3(fromXY.x, fromXY.y, 10),
+              new THREE.Vector3(toXY.x, toXY.y, 10)
+            );
+            var line = new THREE.Line( lineGeom, new THREE.LineBasicMaterial( { color: 0x00ff00, linewidth: 1 } ) );
+            scene.add(line);
+            prevShape2 = line;
+          }
+        }
       }
 
       function makeCanvasTexture(renderer, rtRenderer, done) {
